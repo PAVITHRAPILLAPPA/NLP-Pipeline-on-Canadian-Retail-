@@ -1,0 +1,73 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+url = "LINK"   
+page = requests.get(url)
+print(page.text)
+
+current_page = 1
+data = []
+proceed = True
+
+while proceed:
+    print(f"Currently scraping page: {current_page}")
+
+    # Correct URL for pagination
+    url = f"https://www.trustpilot.com/review/www.amazon.com?page={current_page}"
+
+    # Send a GET request
+    response = requests.get(url)
+    if response.status_code != 200:
+        print(f"Failed to retrieve page {current_page}. Status code: {response.status_code}")
+        break
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Check for reviews
+    all_reviews = soup.find_all("article", class_="styles_reviewCard__hcAvl")
+    if not all_reviews:
+        print("No more reviews found. Stopping the scraper.")
+        proceed = False
+        break
+
+    for review in all_reviews:
+        item = {}
+
+        # Extract the review title
+        title = review.find("span", class_="typography_heading-xxs__QKBS8 typography_appearance-default__AAY17")
+        item["Title"] = title.text.strip() if title else "No Title"
+
+        # Extract the review text
+        review_text = review.find("p", class_="typography_body-l__KUYFJ typography_appearance-default__AAY17 typography_color-black__5LYEn")
+        item["Review"] = review_text.text.strip() if review_text else "No Text"
+
+        # Extract the star rating
+        star_rating = review.find("div", {"data-service-review-rating": True})
+        item["Stars"] = star_rating["data-service-review-rating"] if star_rating else "No Rating"
+
+
+        data.append(item)
+
+    # Increment the page number
+    current_page += 1
+
+    # Stop scraping after 1,106 pages to avoid infinite loop
+    if current_page > 1106:
+        print("Scraped all available pages.")
+        break
+
+# Print the total number of reviews collected
+print(f"Total reviews collected: {len(data)}")
+
+# Print a few sample reviews
+for review in data[:5]:
+    print(review)
+
+df = pd.DataFrame(data)
+
+df.head()
+
+df.to_excel("REVIEWs.xlsx")
+
+df.to_csv("REVIEWs.csv")
